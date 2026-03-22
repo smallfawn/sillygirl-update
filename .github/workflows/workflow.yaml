@@ -52,7 +52,7 @@ jobs:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: sillyGirl_*
         file_glob: true
-        # 强制指定一个固定的标签名，不要用变量
-        tag: latest 
-        overwrite: true
-        body: "最后编译时间: ${{ github.event.head_commit.timestamp }}"
+        tag: latest              # 固定的标签名
+        release_name: "最新编译版本" # 显式指定 Release 的标题
+        overwrite: true          # 每次运行都覆盖旧文件
+        body: "自动编译于: ${{ github.event.head_commit.timestamp }}"
