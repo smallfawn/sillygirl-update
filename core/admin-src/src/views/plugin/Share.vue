@@ -37,42 +37,42 @@
           <el-card v-for="(plugin, idx) in plugins" :key="idx" shadow="hover" class="plugin-card">
             <div class="plugin-info">
               <div class="plugin-title">
-                <el-tag size="small" type="success" v-if="plugin.get('installed') !== undefined">已安装</el-tag>
-                <el-tag size="small" type="warning" v-if="plugin.get('update') !== undefined">可升级</el-tag>
-                <span class="plugin-name">{{ plugin.get('title') || plugin.get('name') || '未命名插件' }}</span>
+                <el-tag size="small" type="success" v-if="plugin.installed !== undefined">已安装</el-tag>
+                <el-tag size="small" type="warning" v-if="plugin.update !== undefined">可升级</el-tag>
+                <span class="plugin-name">{{ plugin.title || plugin.name || '未命名插件' }}</span>
               </div>
-              <div class="plugin-desc">{{ plugin.get('description') || '暂无描述' }}</div>
+              <div class="plugin-desc">{{ plugin.description || '暂无描述' }}</div>
               <div class="plugin-meta">
-                <span v-if="plugin.get('organization')">
-                  <el-icon><OfficeBuilding /></el-icon> {{ plugin.get('organization') }}
+                <span v-if="plugin.organization">
+                  <el-icon><OfficeBuilding /></el-icon> {{ plugin.organization }}
                 </span>
-                <span v-if="plugin.get('version')">v{{ plugin.get('version') }}</span>
+                <span v-if="plugin.version">v{{ plugin.version }}</span>
               </div>
               <div class="plugin-actions">
                 <el-button
-                  v-if="plugin.get('installed') !== undefined"
+                  v-if="plugin.installed !== undefined"
                   type="danger"
                   size="small"
                   @click="handleUninstall(plugin)"
                 >卸载</el-button>
                 <el-button
-                  v-if="plugin.get('update') !== undefined"
+                  v-if="plugin.update !== undefined"
                   type="warning"
                   size="small"
                   @click="handleUpgrade(plugin)"
                 >升级</el-button>
                 <el-button
-                  v-else-if="plugin.get('installed') === undefined"
+                  v-else-if="plugin.installed === undefined"
                   type="primary"
                   size="small"
                   @click="handleInstall(plugin)"
                 >安装</el-button>
                 <el-button
-                  v-if="plugin.get('installed') !== undefined"
+                  v-if="plugin.installed !== undefined"
                   size="small"
                   @click="handleToggleEnable(plugin)"
                 >
-                  {{ plugin.get('enabled') !== false ? '禁用' : '启用' }}
+                  {{ plugin.enabled !== false ? '禁用' : '启用' }}
                 </el-button>
               </div>
             </div>
@@ -138,8 +138,8 @@ async function loadPlugins() {
 
 async function handleInstall(plugin: any) {
   try {
-    await ElMessageBox.confirm(`确定安装插件「${plugin.get('title') || plugin.get('name')}」？`, '提示')
-    const uuid = plugin.get('name_uuid') || plugin.get('uuid')
+    await ElMessageBox.confirm(`确定安装插件「${plugin.title || plugin.name}」？`, '提示')
+    const uuid = plugin.name_uuid || plugin.uuid
     await updateStorage({ [`sillyGirl.plugin_install`]: uuid })
     ElMessage.success('安装请求已发送')
     setTimeout(() => loadPlugins(), 2000)
@@ -148,8 +148,8 @@ async function handleInstall(plugin: any) {
 
 async function handleUninstall(plugin: any) {
   try {
-    await ElMessageBox.confirm(`确定卸载插件「${plugin.get('title') || plugin.get('name')}」？`, '警告', { type: 'warning' })
-    const uuid = plugin.get('name_uuid') || plugin.get('uuid')
+    await ElMessageBox.confirm(`确定卸载插件「${plugin.title || plugin.name}」？`, '警告', { type: 'warning' })
+    const uuid = plugin.name_uuid || plugin.uuid
     await updateStorage({ [`sillyGirl.plugin_uninstall`]: uuid })
     ElMessage.success('卸载请求已发送')
     setTimeout(() => loadPlugins(), 2000)
@@ -158,8 +158,8 @@ async function handleUninstall(plugin: any) {
 
 async function handleUpgrade(plugin: any) {
   try {
-    await ElMessageBox.confirm(`确定升级插件「${plugin.get('title') || plugin.get('name')}」？`, '提示')
-    const uuid = plugin.get('name_uuid') || plugin.get('uuid')
+    await ElMessageBox.confirm(`确定升级插件「${plugin.title || plugin.name}」？`, '提示')
+    const uuid = plugin.name_uuid || plugin.uuid
     await updateStorage({ [`sillyGirl.plugin_upgrade`]: uuid })
     ElMessage.success('升级请求已发送')
     setTimeout(() => loadPlugins(), 2000)
@@ -167,9 +167,9 @@ async function handleUpgrade(plugin: any) {
 }
 
 async function handleToggleEnable(plugin: any) {
-  const uuid = plugin.get('name_uuid') || plugin.get('uuid')
+  const uuid = plugin.name_uuid || plugin.uuid
   const key = `plugins.${uuid}.disabled`
-  const isDisabled = plugin.get('disabled') || plugin.get('enabled') === false
+  const isDisabled = plugin.disabled || plugin.enabled === false
   await updateStorage({ [key]: isDisabled ? '' : 'true' })
   ElMessage.success(isDisabled ? '已启用' : '已禁用')
   setTimeout(() => loadPlugins(), 1000)
