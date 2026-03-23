@@ -1,1 +1,0 @@
-import{t as e}from"./api-CetBM_cY.js";function t(t,n){return e.get(`/storage`,{params:{keys:t,search:n}})}function n(t=1,n=20,r=``){return e.get(`/storage/list`,{params:{current:t,pageSize:n,keys:r}})}function r(t,n){return e.put(`/storage`,t,{params:{uuid:n}})}function i(t){return e.put(`/storage`,{[t]:``})}export{r as i,t as n,n as r,i as t};

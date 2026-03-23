@@ -1,1 +1,0 @@
-import{t as e}from"./api-CetBM_cY.js";function t(t){return e.get(`/plugins/list.json`,{params:t})}function n(t){return e.get(`/proxy/rules`,{params:{keyword:t}})}export{n,t};

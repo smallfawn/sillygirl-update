@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"mime"
 	"strings"
 	"time"
 
@@ -192,10 +191,6 @@ func initWeb() {
 				if !fs.IsDir() {
 					defer file.Close()
 					c.Header("cache-control", "max-age=864000")
-					ext := filepath.Ext(c.Request.URL.Path)
-					if mimeType := mime.TypeByExtension(ext); mimeType != "" {
-						c.Header("Content-Type", mimeType)
-					}
 					io.Copy(c.Writer, file)
 					return
 				} else {
