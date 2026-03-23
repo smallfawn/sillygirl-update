@@ -35,12 +35,7 @@ func init() {
 		}
 		return nil
 	})
-	password = sillyGirl.GetString("password", "password")
-	if sillyGirl.GetString("password") == "" {
-		sillyGirl.Set("password", "password")
-	}
-
-
+	password = sillyGirl.GetString("password")
 	var name = sillyGirl.GetString("name", "傻妞")
 	// if password == "" {
 	// password = utils.GenUUID()
