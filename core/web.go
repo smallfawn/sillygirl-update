@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
 
 	"github.com/cdle/sillyplus/core/logs"
 	"github.com/cdle/sillyplus/core/storage"
@@ -190,6 +192,10 @@ func initWeb() {
 				fs, _ := file.Stat()
 				if !fs.IsDir() {
 					defer file.Close()
+					contentType := mime.TypeByExtension(filepath.Ext(c.Request.URL.Path))
+					if contentType != "" {
+						c.Header("Content-Type", contentType)
+					}
 					c.Header("cache-control", "max-age=864000")
 					io.Copy(c.Writer, file)
 					return
@@ -197,6 +203,7 @@ func initWeb() {
 					file.Close()
 				}
 			}
+
 			data, err := static.ReadFile("admin/index.html")
 			if err == nil {
 				c.Header("Content-Type", "text/html; charset=utf-8")
