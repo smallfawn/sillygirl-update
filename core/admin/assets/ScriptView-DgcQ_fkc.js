@@ -1,0 +1,1 @@
+import{c as a,a as t,t as o,k as n,f as r,o as l}from"./index-D3dCIwcT.js";const p={class:"panel"},m={__name:"ScriptView",setup(u){const e=r();return(i,s)=>(l(),a("section",p,[s[0]||(s[0]=t("h2",null,"脚本详情",-1)),t("p",null,"当前脚本 ID："+o(n(e).params.id),1),s[1]||(s[1]=t("p",{class:"sub"},"后续可在这里迁移原有脚本编辑器、发布、订阅等能力。",-1))]))}};export{m as default};
