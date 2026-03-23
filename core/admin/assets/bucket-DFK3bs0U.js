@@ -1,0 +1,1 @@
+import{r as t}from"./request-BlUZ8Q6L.js";const c=()=>t.get("/api/buckets"),a=e=>t.get(`/api/bucket/${e}`),k=(e,s,u)=>t.post("/api/bucket",{bucket:e,key:s,value:u}),n=(e,s)=>t.delete(`/api/bucket/${e}/${s}`);export{a,n as d,c as g,k as s};
