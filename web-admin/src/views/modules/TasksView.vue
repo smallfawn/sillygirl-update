@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteTask, queryTasks, runTask, saveTask } from '../../api/tasks'
 
 const state = reactive({
@@ -11,8 +12,6 @@ const state = reactive({
   pageSize: 10,
   total: 0,
   list: [],
-  error: '',
-  message: '',
 })
 
 const form = reactive({
@@ -26,7 +25,6 @@ const form = reactive({
 
 async function fetchTasks() {
   state.loading = true
-  state.error = ''
   try {
     const res = await queryTasks({
       current: state.current,
@@ -35,29 +33,25 @@ async function fetchTasks() {
     state.list = Array.isArray(res?.data) ? res.data : []
     state.total = Number(res?.total || 0)
   } catch (error) {
-    state.error = error.message || '获取任务列表失败'
+    ElMessage.error(error.message || '获取任务列表失败')
   } finally {
     state.loading = false
   }
 }
 
 function formatTime(unix) {
-  if (!unix) {
-    return '-'
-  }
+  if (!unix) return '-'
   const date = new Date(unix * 1000)
   return date.toLocaleString('zh-CN', { hour12: false })
 }
 
 async function submitTask() {
   if (!form.task_id || !form.title || !form.schedule || !form.command) {
-    state.error = '请至少填写任务ID、任务名称、Cron 表达式和指令'
+    ElMessage.warning('请填写任务ID、名称、Cron 和指令')
     return
   }
 
   state.saving = true
-  state.message = ''
-  state.error = ''
   try {
     const payload = {
       task_id: form.task_id,
@@ -73,10 +67,10 @@ async function submitTask() {
     if (!res?.success) {
       throw new Error(res?.errorMessage || '保存任务失败')
     }
-    state.message = `任务已保存：${form.task_id}`
+    ElMessage.success(`任务已保存：${form.task_id}`)
     await fetchTasks()
   } catch (error) {
-    state.error = error.message || '保存任务失败'
+    ElMessage.error(error.message || '保存任务失败')
   } finally {
     state.saving = false
   }
@@ -102,57 +96,47 @@ function resetForm() {
 
 async function handleRun(taskId) {
   state.runningId = taskId
-  state.message = ''
-  state.error = ''
   try {
     const res = await runTask(taskId)
     if (!res?.success) {
       throw new Error(res?.errorMessage || '任务执行失败')
     }
-    state.message = `任务已执行：${taskId}`
+    ElMessage.success(`任务已执行：${taskId}`)
   } catch (error) {
-    state.error = error.message || '任务执行失败'
+    ElMessage.error(error.message || '任务执行失败')
   } finally {
     state.runningId = ''
   }
 }
 
 async function handleDelete(taskId) {
-  if (!window.confirm(`确定删除任务 ${taskId} 吗？`)) {
+  try {
+    await ElMessageBox.confirm(`确定删除任务 ${taskId} 吗？`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch (e) {
     return
   }
 
   state.deletingId = taskId
-  state.message = ''
-  state.error = ''
   try {
     const res = await deleteTask(taskId)
     if (!res?.success) {
       throw new Error(res?.errorMessage || '删除失败')
     }
-    state.message = `任务已删除：${taskId}`
+    ElMessage.success(`任务已删除：${taskId}`)
     await fetchTasks()
   } catch (error) {
-    state.error = error.message || '删除失败'
+    ElMessage.error(error.message || '删除失败')
   } finally {
     state.deletingId = ''
   }
 }
 
-function prevPage() {
-  if (state.current <= 1) {
-    return
-  }
-  state.current -= 1
-  fetchTasks()
-}
-
-function nextPage() {
-  const pageCount = Math.max(1, Math.ceil(state.total / state.pageSize))
-  if (state.current >= pageCount) {
-    return
-  }
-  state.current += 1
+function handlePageChange(page) {
+  state.current = page
   fetchTasks()
 }
 
@@ -161,262 +145,133 @@ onMounted(fetchTasks)
 
 <template>
   <section class="tasks-page">
-    <section class="panel">
-      <h3>任务管理</h3>
-      <p class="hint">支持任务列表查看、手动执行、删除，以及基础任务新增/编辑。</p>
+    <el-row :gutter="12">
+      <el-col :xs="24" :md="10">
+        <el-card shadow="never" class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>任务配置</h3>
+              <p class="hint">支持新增/编辑，Cron 语法与指令直填。</p>
+            </div>
+            <el-button text type="primary" @click="resetForm">清空</el-button>
+          </div>
 
-      <div class="form-grid">
-        <label>
-          任务ID
-          <input v-model.trim="form.task_id" placeholder="例如：daily-clean" />
-        </label>
-        <label>
-          任务名称
-          <input v-model.trim="form.title" placeholder="例如：每日清理" />
-        </label>
-        <label>
-          Cron 表达式
-          <input v-model.trim="form.schedule" placeholder="例如：0 * * * *" />
-        </label>
-        <label>
-          备注
-          <input v-model.trim="form.remark" placeholder="可选" />
-        </label>
-      </div>
+          <el-form :model="form" label-position="top" :disabled="state.saving">
+            <el-form-item label="任务 ID">
+              <el-input v-model.trim="form.task_id" placeholder="必填，如 task_001" />
+            </el-form-item>
+            <el-form-item label="任务名称">
+              <el-input v-model.trim="form.title" placeholder="必填" />
+            </el-form-item>
+            <el-form-item label="Cron 表达式">
+              <el-input v-model.trim="form.schedule" placeholder="如 0 * * * *" />
+            </el-form-item>
+            <el-form-item label="任务指令">
+              <el-input v-model.trim="form.command" type="textarea" :rows="2" placeholder="执行指令" />
+            </el-form-item>
+            <el-form-item label="备注">
+              <el-input v-model.trim="form.remark" placeholder="可选" />
+            </el-form-item>
+            <el-form-item>
+              <el-switch v-model="form.enable" active-text="启用" inactive-text="停用" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="state.saving" @click="submitTask">保存</el-button>
+              <el-button @click="resetForm">重置</el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-col>
 
-      <label class="command-row">
-        指令
-        <textarea v-model.trim="form.command" rows="3" placeholder="任务触发时发送的命令" />
-      </label>
+      <el-col :xs="24" :md="14">
+        <el-card shadow="never" class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>任务列表</h3>
+              <p class="hint">共 {{ state.total }} 条</p>
+            </div>
+            <el-button text :loading="state.loading" @click="fetchTasks">刷新</el-button>
+          </div>
 
-      <label class="checkbox">
-        <input v-model="form.enable" type="checkbox" />
-        启用任务
-      </label>
+          <el-table :data="state.list" stripe v-loading="state.loading" style="width: 100%">
+            <el-table-column prop="task_id" label="任务ID" width="140" />
+            <el-table-column prop="title" label="名称" width="160" />
+            <el-table-column prop="schedule" label="Cron" width="140" />
+            <el-table-column prop="command" label="指令" show-overflow-tooltip />
+            <el-table-column prop="remark" label="备注" show-overflow-tooltip width="140" />
+            <el-table-column prop="enable" label="启用" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.enable ? 'success' : 'info'">{{ row.enable ? '是' : '否' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="最近执行" width="140">
+              <template #default="{ row }">{{ formatTime(row.last_time) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+              <template #default="{ row }">
+                <el-space>
+                  <el-button size="small" @click="editTask(row)">编辑</el-button>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    plain
+                    :loading="state.runningId === row.task_id"
+                    @click="handleRun(row.task_id)"
+                  >执行</el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    plain
+                    :loading="state.deletingId === row.task_id"
+                    @click="handleDelete(row.task_id)"
+                  >删除</el-button>
+                </el-space>
+              </template>
+            </el-table-column>
+          </el-table>
 
-      <div class="actions">
-        <button :disabled="state.saving" class="primary" @click="submitTask">
-          {{ state.saving ? '保存中...' : '保存任务' }}
-        </button>
-        <button :disabled="state.saving" @click="resetForm">重置</button>
-      </div>
-
-      <p v-if="state.message" class="msg success">{{ state.message }}</p>
-      <p v-if="state.error" class="msg error">{{ state.error }}</p>
-    </section>
-
-    <section class="panel">
-      <div class="table-head">
-        <strong>任务列表</strong>
-        <span>共 {{ state.total }} 条</span>
-      </div>
-
-      <div v-if="state.loading" class="empty">加载中...</div>
-      <div v-else-if="!state.list.length" class="empty">暂无任务</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>任务ID</th>
-              <th>名称</th>
-              <th>计划</th>
-              <th>命令</th>
-              <th>启用</th>
-              <th>创建时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="task in state.list" :key="task.task_id">
-              <td>{{ task.task_id }}</td>
-              <td>{{ task.title }}</td>
-              <td><code>{{ task.schedule }}</code></td>
-              <td>{{ task.command }}</td>
-              <td>{{ task.enable ? '是' : '否' }}</td>
-              <td>{{ formatTime(task.created_at) }}</td>
-              <td>
-                <div class="row-actions">
-                  <button @click="editTask(task)">编辑</button>
-                  <button :disabled="state.runningId === task.task_id" @click="handleRun(task.task_id)">
-                    {{ state.runningId === task.task_id ? '执行中' : '执行' }}
-                  </button>
-                  <button
-                    class="danger"
-                    :disabled="state.deletingId === task.task_id"
-                    @click="handleDelete(task.task_id)"
-                  >
-                    {{ state.deletingId === task.task_id ? '删除中' : '删除' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <footer class="pager">
-        <button :disabled="state.current <= 1 || state.loading" @click="prevPage">上一页</button>
-        <span>第 {{ state.current }} 页</span>
-        <button :disabled="state.current >= Math.ceil(state.total / state.pageSize) || state.loading" @click="nextPage">下一页</button>
-      </footer>
-    </section>
+          <div class="table-footer">
+            <el-pagination
+              background
+              layout="prev, pager, next, jumper"
+              :current-page="state.current"
+              :page-size="state.pageSize"
+              :total="state.total"
+              @current-change="handlePageChange"
+            />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
   </section>
 </template>
 
 <style scoped>
 .tasks-page {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
-.panel {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-h3 {
+.panel h3 {
   margin: 0;
-  color: #111827;
 }
 
 .hint {
-  margin: 8px 0 14px;
+  margin: 2px 0 0;
   color: #6b7280;
-  font-size: 14px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-label {
-  display: grid;
-  gap: 6px;
-  color: #374151;
   font-size: 13px;
 }
 
-input,
-textarea {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.command-row {
-  margin-top: 10px;
-}
-
-.checkbox {
-  margin-top: 10px;
+.table-footer {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
-}
-
-button {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 7px 12px;
-  background: #fff;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.primary {
-  background: #7c3aed;
-  border-color: #7c3aed;
-  color: #fff;
-}
-
-.table-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  color: #374151;
-  font-size: 14px;
-}
-
-.table-wrap {
-  overflow: auto;
-}
-
-table {
-  width: 100%;
-  min-width: 920px;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  border: 1px solid #e5e7eb;
-  padding: 10px;
-  text-align: left;
-  vertical-align: top;
-}
-
-th {
-  background: #f9fafb;
-}
-
-code {
-  color: #5b21b6;
-}
-
-.row-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.pager {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-}
-
-.msg {
-  font-size: 13px;
-  margin: 8px 0 0;
-}
-
-.msg.success {
-  color: #047857;
-}
-
-.msg.error {
-  color: #b91c1c;
-}
-
-.empty {
-  color: #6b7280;
-}
-
-@media (max-width: 900px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
+  margin-top: 10px;
 }
 </style>

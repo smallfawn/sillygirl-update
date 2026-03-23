@@ -1,9 +1,11 @@
+@import 'element-plus/dist/index.css';
+
 :root {
-  font-family: 'Fira Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #1f2937;
-  background-color: #f3f4f6;
+  background-color: #f5f6fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,10 +22,6 @@ body,
   margin: 0;
   width: 100%;
   min-height: 100vh;
-}
-
-body {
-  background: #f3f4f6;
 }
 
 a {

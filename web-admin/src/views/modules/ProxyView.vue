@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive } from 'vue'
+import { onMounted, reactive } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   deleteProxyConfig,
   queryProxyList,
@@ -18,8 +19,6 @@ const state = reactive({
   pageSize: 50,
   scriptsMap: {},
   ruleOptions: [],
-  message: '',
-  error: '',
 })
 
 const form = reactive({
@@ -33,20 +32,15 @@ const form = reactive({
   pluginsText: '',
 })
 
-const hasData = computed(() => state.list.length > 0)
+const hasData = () => state.list.length > 0
 
 function normalizeList(raw) {
-  if (!Array.isArray(raw)) {
-    return []
-  }
-
+  if (!Array.isArray(raw)) return []
   return raw
     .map((row) => {
       const id = row.key
       const value = String(row.value || '')
-      if (!id || !value.startsWith('o:')) {
-        return null
-      }
+      if (!id || !value.startsWith('o:')) return null
       try {
         const parsed = JSON.parse(value.slice(2))
         return {
@@ -118,11 +112,11 @@ async function fetchRules(keyword = '') {
     const data = res?.data || {}
     state.ruleOptions = Object.keys(data)
   } catch (error) {
-    state.error = error.message || '获取规则候选失败'
+    ElMessage.error(error.message || '获取规则候选失败')
   }
 }
 
-function appendRule(rule) {
+async function appendRule(rule) {
   const current = parseMultiText(form.rulesText)
   if (!current.includes(rule)) {
     current.push(rule)
@@ -135,13 +129,12 @@ async function fetchScripts() {
     const res = await queryProxyScripts()
     state.scriptsMap = res?.data || {}
   } catch (error) {
-    state.error = error.message || '获取脚本列表失败'
+    ElMessage.error(error.message || '获取脚本列表失败')
   }
 }
 
 async function fetchList() {
   state.loading = true
-  state.error = ''
   try {
     const res = await queryProxyList({
       current: state.current,
@@ -150,29 +143,24 @@ async function fetchList() {
     state.total = Number(res?.total || 0)
     state.list = normalizeList(res?.data)
   } catch (error) {
-    state.error = error.message || '获取代理配置失败'
+    ElMessage.error(error.message || '获取代理配置失败')
   } finally {
     state.loading = false
   }
 }
 
 function getStorageError(res, key) {
-  if (!res?.errors) {
-    return ''
-  }
+  if (!res?.errors) return ''
   return res.errors[key] || ''
 }
 
 async function submitProxy() {
   if (!form.id || !form.server || !form.port) {
-    state.error = '请至少填写 ID、服务地址和端口'
+    ElMessage.warning('请至少填写 ID、服务地址和端口')
     return
   }
 
   state.saving = true
-  state.error = ''
-  state.message = ''
-
   try {
     const payload = {
       id: form.id,
@@ -187,43 +175,46 @@ async function submitProxy() {
 
     const res = await saveProxyConfig(form.id, payload)
     const err = getStorageError(res, `proxies.${form.id}`)
-    if (err) {
-      throw new Error(err)
-    }
+    if (err) throw new Error(err)
 
-    state.message = `代理配置已保存：${form.id}`
+    ElMessage.success(`代理配置已保存：${form.id}`)
     await fetchList()
   } catch (error) {
-    state.error = error.message || '保存代理配置失败'
+    ElMessage.error(error.message || '保存代理配置失败')
   } finally {
     state.saving = false
   }
 }
 
 async function removeProxy(id) {
-  if (!id) {
-    return
-  }
-  if (!window.confirm(`确定删除代理配置「${id}」吗？`)) {
+  if (!id) return
+  try {
+    await ElMessageBox.confirm(`确定删除代理配置「${id}」吗？`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch (e) {
     return
   }
 
   state.deletingId = id
-  state.error = ''
-  state.message = ''
   try {
     const res = await deleteProxyConfig(id)
     const err = getStorageError(res, `proxies.${id}`)
-    if (err) {
-      throw new Error(err)
-    }
-    state.message = `已删除代理配置：${id}`
+    if (err) throw new Error(err)
+    ElMessage.success(`已删除代理配置：${id}`)
     await fetchList()
   } catch (error) {
-    state.error = error.message || '删除代理配置失败'
+    ElMessage.error(error.message || '删除代理配置失败')
   } finally {
     state.deletingId = ''
   }
+}
+
+function handlePageChange(page) {
+  state.current = page
+  fetchList()
 }
 
 onMounted(async () => {
@@ -233,286 +224,190 @@ onMounted(async () => {
 
 <template>
   <section class="proxy-page">
-    <section class="panel">
-      <h3>代理设置</h3>
-      <p class="hint">支持维护代理节点、域名规则与脚本绑定。规则/脚本均可按行或逗号分隔输入。</p>
-
-      <div class="form-grid">
-        <label>
-          配置 ID
-          <input v-model.trim="form.id" placeholder="建议使用 uuid" />
-        </label>
-        <label>
-          名称
-          <input v-model.trim="form.name" placeholder="展示名称" />
-        </label>
-        <label>
-          类型
-          <input v-model.trim="form.type" placeholder="如 socks5/http" />
-        </label>
-        <label>
-          服务地址
-          <input v-model.trim="form.server" placeholder="如 127.0.0.1" />
-        </label>
-        <label>
-          端口
-          <input v-model.number="form.port" type="number" min="1" />
-        </label>
-        <label class="checkbox-row">
-          <input v-model="form.enable" type="checkbox" />
-          启用此代理
-        </label>
+    <el-card shadow="never" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>代理设置</h3>
+          <p class="hint">维护代理节点、域名规则与脚本绑定。规则/脚本可按行或逗号分隔输入。</p>
+        </div>
+        <el-space>
+          <el-button text :loading="state.loading" @click="fetchList">刷新</el-button>
+        </el-space>
       </div>
 
-      <div class="multi-grid">
-        <label>
-          规则（rules）
-          <textarea
-            v-model.trim="form.rulesText"
-            rows="5"
-            placeholder="每行一个域名规则，如 api.telegram.org"
-            @input="fetchRules(form.rulesText.split(/[,\n]/).slice(-1)[0] || '')"
-          />
-          <div class="suggestions" v-if="state.ruleOptions.length">
-            <button v-for="rule in state.ruleOptions" :key="rule" @click="appendRule(rule)">{{ rule }}</button>
-          </div>
-        </label>
+      <el-form :model="form" label-position="top" :disabled="state.saving">
+        <el-row :gutter="12">
+          <el-col :xs="24" :sm="12" :md="6">
+            <el-form-item label="配置 ID">
+              <el-input v-model.trim="form.id" placeholder="建议使用 uuid" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="6">
+            <el-form-item label="名称">
+              <el-input v-model.trim="form.name" placeholder="展示名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="4">
+            <el-form-item label="类型">
+              <el-input v-model.trim="form.type" placeholder="如 socks5/http" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="5">
+            <el-form-item label="服务地址">
+              <el-input v-model.trim="form.server" placeholder="如 127.0.0.1" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="3">
+            <el-form-item label="端口">
+              <el-input v-model.number="form.port" type="number" min="1" />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
-        <label>
-          脚本 UUID（plugins）
-          <textarea v-model.trim="form.pluginsText" rows="5" placeholder="每行一个插件 UUID" />
-          <p class="tip" v-if="Object.keys(state.scriptsMap).length">
-            可用脚本：
-            <span v-for="(name, id) in state.scriptsMap" :key="id">{{ name }} ({{ id }})；</span>
-          </p>
-        </label>
+        <el-row :gutter="12">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="规则（rules）">
+              <el-input
+                v-model.trim="form.rulesText"
+                type="textarea"
+                :rows="5"
+                placeholder="每行一个域名规则，如 api.telegram.org"
+                @input="fetchRules((form.rulesText.split(/[,\n]/).slice(-1)[0] || '').trim())"
+              />
+              <el-space wrap class="suggestions" v-if="state.ruleOptions.length">
+                <el-tag
+                  v-for="rule in state.ruleOptions"
+                  :key="rule"
+                  type="info"
+                  effect="plain"
+                  class="clickable"
+                  @click="appendRule(rule)"
+                >{{ rule }}</el-tag>
+              </el-space>
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="脚本 UUID（plugins）">
+              <el-input
+                v-model.trim="form.pluginsText"
+                type="textarea"
+                :rows="5"
+                placeholder="每行一个插件 UUID"
+              />
+              <p class="tip" v-if="Object.keys(state.scriptsMap).length">
+                可用脚本：
+                <span v-for="(name, id) in state.scriptsMap" :key="id">{{ name }} ({{ id }})；</span>
+              </p>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="12">
+          <el-col :xs="24" :sm="12" :md="6">
+            <el-switch v-model="form.enable" active-text="启用此代理" />
+          </el-col>
+        </el-row>
+
+        <el-space style="margin-top: 8px">
+          <el-button type="primary" :loading="state.saving" @click="submitProxy">保存配置</el-button>
+          <el-button @click="resetForm">清空表单</el-button>
+        </el-space>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="never" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>代理配置列表</h3>
+          <p class="hint">共 {{ state.total }} 条</p>
+        </div>
       </div>
 
-      <div class="actions">
-        <button class="primary" :disabled="state.saving" @click="submitProxy">
-          {{ state.saving ? '保存中...' : '保存配置' }}
-        </button>
-        <button :disabled="state.saving" @click="resetForm">清空表单</button>
-        <button :disabled="state.loading" @click="fetchList">刷新列表</button>
-      </div>
+      <el-table :data="state.list" stripe v-loading="state.loading" style="width: 100%">
+        <el-table-column prop="id" label="ID" width="140" />
+        <el-table-column prop="name" label="名称" width="160" />
+        <el-table-column label="地址" min-width="160">
+          <template #default="{ row }">{{ row.server }}:{{ row.port }}</template>
+        </el-table-column>
+        <el-table-column prop="type" label="类型" width="100" />
+        <el-table-column label="规则数" width="90">
+          <template #default="{ row }">{{ row.rules.length }}</template>
+        </el-table-column>
+        <el-table-column label="脚本数" width="90">
+          <template #default="{ row }">{{ row.plugins.length }}</template>
+        </el-table-column>
+        <el-table-column label="启用" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.enable ? 'success' : 'info'">{{ row.enable ? '是' : '否' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" fixed="right">
+          <template #default="{ row }">
+            <el-space>
+              <el-button size="small" @click="fillForm(row)">编辑</el-button>
+              <el-button
+                size="small"
+                type="danger"
+                plain
+                :loading="state.deletingId === row.id"
+                @click="removeProxy(row.id)"
+              >删除</el-button>
+            </el-space>
+          </template>
+        </el-table-column>
+      </el-table>
 
-      <p v-if="state.message" class="msg success">{{ state.message }}</p>
-      <p v-if="state.error" class="msg error">{{ state.error }}</p>
-    </section>
-
-    <section class="panel">
-      <div class="table-head">
-        <strong>代理配置列表</strong>
-        <span>共 {{ state.total }} 条</span>
+      <div class="table-footer">
+        <el-pagination
+          background
+          layout="prev, pager, next, jumper"
+          :current-page="state.current"
+          :page-size="state.pageSize"
+          :total="state.total"
+          @current-change="handlePageChange"
+        />
       </div>
-
-      <div v-if="state.loading" class="empty">加载中...</div>
-      <div v-else-if="!hasData" class="empty">暂无配置</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>名称</th>
-              <th>地址</th>
-              <th>类型</th>
-              <th>规则数</th>
-              <th>脚本数</th>
-              <th>启用</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in state.list" :key="row.id">
-              <td>{{ row.id }}</td>
-              <td>{{ row.name }}</td>
-              <td>{{ row.server }}:{{ row.port }}</td>
-              <td>{{ row.type || '-' }}</td>
-              <td>{{ row.rules.length }}</td>
-              <td>{{ row.plugins.length }}</td>
-              <td>{{ row.enable ? '是' : '否' }}</td>
-              <td>
-                <div class="row-actions">
-                  <button @click="fillForm(row)">编辑</button>
-                  <button class="danger" :disabled="state.deletingId === row.id" @click="removeProxy(row.id)">
-                    {{ state.deletingId === row.id ? '删除中...' : '删除' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+    </el-card>
   </section>
 </template>
 
 <style scoped>
 .proxy-page {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
-.panel {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-}
-
-h3 {
-  margin: 0;
-  color: #111827;
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .hint {
-  margin: 8px 0 12px;
+  margin: 2px 0 0;
   color: #6b7280;
   font-size: 13px;
-}
-
-.form-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-}
-
-label {
-  display: grid;
-  gap: 6px;
-  color: #374151;
-  font-size: 13px;
-}
-
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-}
-
-input,
-textarea {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.multi-grid {
-  margin-top: 10px;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
 }
 
 .suggestions {
   margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
-.suggestions button {
-  border: 1px solid #ddd6fe;
-  background: #f5f3ff;
-  color: #6d28d9;
-  border-radius: 999px;
-  padding: 4px 10px;
+.clickable {
+  cursor: pointer;
 }
 
 .tip {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: #6b7280;
   font-size: 12px;
 }
 
-.actions {
-  margin-top: 12px;
+.table-footer {
   display: flex;
-  gap: 8px;
-}
-
-button {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 7px 12px;
-  background: #fff;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.primary {
-  background: #7c3aed;
-  border-color: #7c3aed;
-  color: #fff;
-}
-
-.danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.msg {
-  margin: 8px 0 0;
-  font-size: 13px;
-}
-
-.msg.success {
-  color: #047857;
-}
-
-.msg.error {
-  color: #b91c1c;
-}
-
-.table-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  color: #374151;
-  font-size: 14px;
-}
-
-.table-wrap {
-  overflow: auto;
-}
-
-table {
-  width: 100%;
-  min-width: 900px;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  border: 1px solid #e5e7eb;
-  padding: 10px;
-  text-align: left;
-  color: #1f2937;
-  font-size: 13px;
-}
-
-.row-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.empty {
-  padding: 20px 10px;
-  text-align: center;
-  color: #6b7280;
-}
-
-@media (max-width: 960px) {
-  .form-grid,
-  .multi-grid {
-    grid-template-columns: 1fr;
-  }
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 </style>

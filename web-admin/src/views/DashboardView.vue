@@ -20,63 +20,51 @@ const cards = computed(() => [
 
 <template>
   <section class="dashboard">
-    <header class="welcome">
-      <h3>你好，{{ userStore.displayName }}</h3>
-      <p>这是新版 Vue3 + Vite + Pinia 管理后台骨架，已完成登录鉴权与导航框架。</p>
-    </header>
+    <el-card class="welcome" shadow="hover">
+      <div class="welcome-content">
+        <div>
+          <h3>你好，{{ userStore.displayName }}</h3>
+          <p>这是新版 Vue3 + Vite + Pinia + Element Plus 管理后台骨架，已完成登录鉴权与导航框架。</p>
+        </div>
+      </div>
+    </el-card>
 
-    <div class="grid">
-      <article v-for="item in cards" :key="item.route" class="card" @click="router.push(item.route)">
-        <h4>{{ item.title }}</h4>
-        <p>{{ item.desc }}</p>
-      </article>
-    </div>
+    <el-row :gutter="12">
+      <el-col v-for="item in cards" :key="item.route" :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="card" shadow="hover" @click="router.push(item.route)">
+          <h4>{{ item.title }}</h4>
+          <p>{{ item.desc }}</p>
+        </el-card>
+      </el-col>
+    </el-row>
   </section>
 </template>
 
 <style scoped>
 .dashboard {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .welcome {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 18px;
+  border-radius: 12px;
 }
 
-.welcome h3 {
+.welcome-content h3 {
   margin: 0;
   color: #111827;
   font-size: 20px;
 }
 
-.welcome p {
-  margin: 8px 0 0;
+.welcome-content p {
+  margin: 6px 0 0;
   color: #4b5563;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
-}
-
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
+  margin-top: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-}
-
-.card:hover {
-  border-color: #c4b5fd;
-  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.12);
-  transform: translateY(-1px);
 }
 
 .card h4 {
@@ -90,4 +78,5 @@ const cards = computed(() => [
   font-size: 14px;
 }
 </style>
+
 

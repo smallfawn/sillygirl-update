@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteReply, queryReplyList, saveReply } from '../../api/reply'
 
 const state = reactive({
@@ -14,8 +15,6 @@ const state = reactive({
   value: '',
   number: '',
   platforms: [],
-  message: '',
-  error: '',
 })
 
 const form = reactive({
@@ -30,7 +29,6 @@ const form = reactive({
 
 async function fetchList() {
   state.loading = true
-  state.error = ''
   try {
     const res = await queryReplyList({
       current: state.current,
@@ -43,7 +41,7 @@ async function fetchList() {
     state.total = Number(res?.total || 0)
     state.platforms = Array.isArray(res?.platforms) ? res.platforms : []
   } catch (error) {
-    state.error = error.message || '获取自动回复列表失败'
+    ElMessage.error(error.message || '获取自动回复列表失败')
   } finally {
     state.loading = false
   }
@@ -78,13 +76,11 @@ function editRule(item) {
 
 async function submitRule() {
   if (!form.keyword || !form.value) {
-    state.error = '请至少填写关键词和回复内容'
+    ElMessage.warning('请填写关键词和回复内容')
     return
   }
 
   state.saving = true
-  state.message = ''
-  state.error = ''
   try {
     const payload = {
       id: Number(form.id || 0),
@@ -99,45 +95,48 @@ async function submitRule() {
     if (!res?.success) {
       throw new Error(res?.errorMessage || '保存失败')
     }
-    state.message = payload.id ? `规则已更新：#${payload.id}` : '规则已新增'
+    ElMessage.success(payload.id ? `规则已更新：#${payload.id}` : '规则已新增')
     await fetchList()
-    if (!payload.id) {
-      resetForm()
-    }
+    if (!payload.id) resetForm()
   } catch (error) {
-    state.error = error.message || '保存失败'
+    ElMessage.error(error.message || '保存失败')
   } finally {
     state.saving = false
   }
 }
 
 async function handleDelete(id) {
-  if (!window.confirm(`确定删除规则 #${id} 吗？`)) {
+  try {
+    await ElMessageBox.confirm(`确定删除规则 #${id} 吗？`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch (e) {
     return
   }
+
   state.deletingId = id
-  state.message = ''
-  state.error = ''
   try {
     const res = await deleteReply(id)
     if (!res?.success) {
       throw new Error(res?.errorMessage || '删除失败')
     }
-    state.message = `规则已删除：#${id}`
+    ElMessage.success(`规则已删除：#${id}`)
     await fetchList()
   } catch (error) {
-    state.error = error.message || '删除失败'
+    ElMessage.error(error.message || '删除失败')
   } finally {
     state.deletingId = null
   }
 }
 
-function search() {
+function handleSearch() {
   state.current = 1
   fetchList()
 }
 
-function resetSearch() {
+function handleResetSearch() {
   state.keyword = ''
   state.value = ''
   state.number = ''
@@ -145,20 +144,8 @@ function resetSearch() {
   fetchList()
 }
 
-function prevPage() {
-  if (state.current <= 1) {
-    return
-  }
-  state.current -= 1
-  fetchList()
-}
-
-function nextPage() {
-  const pageCount = Math.max(1, Math.ceil(state.total / state.pageSize))
-  if (state.current >= pageCount) {
-    return
-  }
-  state.current += 1
+function handlePageChange(page) {
+  state.current = page
   fetchList()
 }
 
@@ -167,291 +154,157 @@ onMounted(fetchList)
 
 <template>
   <section class="reply-page">
-    <section class="panel">
-      <h3>自动回复规则</h3>
-      <p class="hint">支持规则检索、新增、编辑和删除。平台填写用英文逗号分隔（如 wx,qq,tg）。</p>
-
-      <div class="search-grid">
-        <label>
-          关键词
-          <input v-model.trim="state.keyword" placeholder="模糊匹配关键词" />
-        </label>
-        <label>
-          回复内容
-          <input v-model.trim="state.value" placeholder="模糊匹配回复值" />
-        </label>
-        <label>
-          号码
-          <input v-model.trim="state.number" placeholder="用户/群号（精确）" />
-        </label>
+    <el-card shadow="never" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>自动回复规则</h3>
+          <p class="hint">支持规则检索、新增、编辑和删除。平台用英文逗号分隔（如 wx,qq,tg）。</p>
+        </div>
+        <el-space>
+          <el-button text @click="handleResetSearch">重置</el-button>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
+        </el-space>
       </div>
 
-      <div class="actions">
-        <button class="primary" :disabled="state.loading" @click="search">查询</button>
-        <button :disabled="state.loading" @click="resetSearch">重置</button>
-      </div>
-    </section>
+      <el-row :gutter="12" class="search-row">
+        <el-col :xs="24" :sm="8">
+          <el-input v-model.trim="state.keyword" placeholder="关键词" clearable />
+        </el-col>
+        <el-col :xs="24" :sm="8">
+          <el-input v-model.trim="state.value" placeholder="回复内容" clearable />
+        </el-col>
+        <el-col :xs="24" :sm="8">
+          <el-input v-model.trim="state.number" placeholder="号码（精确）" clearable />
+        </el-col>
+      </el-row>
+    </el-card>
 
-    <section class="panel">
-      <h4>新增 / 编辑规则</h4>
-      <div class="form-grid">
-        <label>
-          规则 ID（编辑时填写）
-          <input v-model.trim="form.id" placeholder="留空表示新增" />
-        </label>
-        <label>
-          号码
-          <input v-model.trim="form.number" placeholder="可选，限定用户/群" />
-        </label>
-        <label>
-          昵称
-          <input v-model.trim="form.nickname" placeholder="可选" />
-        </label>
-        <label>
-          优先级
-          <input v-model.number="form.priority" type="number" />
-        </label>
-        <label>
-          关键词
-          <input v-model.trim="form.keyword" placeholder="触发关键词" />
-        </label>
-        <label>
-          平台
-          <input v-model.trim="form.platformsText" placeholder="如 wx,qq,tg" />
-        </label>
-      </div>
+    <el-row :gutter="12">
+      <el-col :xs="24" :md="10">
+        <el-card shadow="never" class="panel">
+          <div class="panel-head">
+            <div>
+              <h4>新增 / 编辑规则</h4>
+              <p class="hint">规则ID留空表示新增。</p>
+            </div>
+            <el-button text type="primary" @click="resetForm">清空</el-button>
+          </div>
 
-      <label class="full-row">
-        回复内容
-        <textarea v-model.trim="form.value" rows="3" placeholder="触发后返回内容" />
-      </label>
+          <el-form :model="form" label-position="top" :disabled="state.saving">
+            <el-form-item label="规则 ID（编辑时填写）">
+              <el-input v-model.trim="form.id" placeholder="留空表示新增" />
+            </el-form-item>
+            <el-form-item label="号码">
+              <el-input v-model.trim="form.number" placeholder="可选，限定用户/群" />
+            </el-form-item>
+            <el-form-item label="昵称">
+              <el-input v-model.trim="form.nickname" placeholder="可选" />
+            </el-form-item>
+            <el-form-item label="优先级">
+              <el-input-number v-model="form.priority" :min="0" :max="9999" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="关键词">
+              <el-input v-model.trim="form.keyword" placeholder="触发关键词" />
+            </el-form-item>
+            <el-form-item label="回复内容">
+              <el-input v-model.trim="form.value" type="textarea" :rows="2" placeholder="回复内容" />
+            </el-form-item>
+            <el-form-item label="平台">
+              <el-input v-model.trim="form.platformsText" placeholder="如 wx,qq,tg" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="state.saving" @click="submitRule">保存</el-button>
+              <el-button @click="resetForm">重置</el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-col>
 
-      <div class="actions">
-        <button class="primary" :disabled="state.saving" @click="submitRule">
-          {{ state.saving ? '保存中...' : '保存规则' }}
-        </button>
-        <button :disabled="state.saving" @click="resetForm">清空表单</button>
-      </div>
+      <el-col :xs="24" :md="14">
+        <el-card shadow="never" class="panel">
+          <div class="panel-head">
+            <div>
+              <h4>规则列表</h4>
+              <p class="hint">共 {{ state.total }} 条</p>
+            </div>
+            <el-button text :loading="state.loading" @click="fetchList">刷新</el-button>
+          </div>
 
-      <p v-if="state.message" class="msg success">{{ state.message }}</p>
-      <p v-if="state.error" class="msg error">{{ state.error }}</p>
-    </section>
+          <el-table :data="state.list" stripe v-loading="state.loading" style="width: 100%">
+            <el-table-column prop="id" label="#" width="80" />
+            <el-table-column prop="number" label="号码" width="140" />
+            <el-table-column prop="nickname" label="昵称" width="140" />
+            <el-table-column prop="keyword" label="关键词" width="160" />
+            <el-table-column prop="value" label="回复内容" show-overflow-tooltip />
+            <el-table-column prop="priority" label="优先级" width="90" />
+            <el-table-column label="平台" width="140">
+              <template #default="{ row }">
+                <el-tag v-for="p in row.platforms || []" :key="p" type="info" effect="plain" style="margin: 2px">{{ p }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="{ row }">
+                <el-space>
+                  <el-button size="small" @click="editRule(row)">编辑</el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    plain
+                    :loading="state.deletingId === row.id"
+                    @click="handleDelete(row.id)"
+                  >删除</el-button>
+                </el-space>
+              </template>
+            </el-table-column>
+          </el-table>
 
-    <section class="panel">
-      <div class="table-head">
-        <strong>规则列表</strong>
-        <span>共 {{ state.total }} 条</span>
-      </div>
-
-      <div v-if="state.loading" class="empty">加载中...</div>
-      <div v-else-if="!state.list.length" class="empty">暂无数据</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>关键词</th>
-              <th>回复内容</th>
-              <th>号码</th>
-              <th>优先级</th>
-              <th>平台</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in state.list" :key="item.id">
-              <td>#{{ item.id }}</td>
-              <td>{{ item.keyword }}</td>
-              <td>{{ item.value }}</td>
-              <td>{{ item.number || '-' }}</td>
-              <td>{{ item.priority }}</td>
-              <td>{{ Array.isArray(item.platforms) && item.platforms.length ? item.platforms.join(',') : '-' }}</td>
-              <td>
-                <div class="row-actions">
-                  <button @click="editRule(item)">编辑</button>
-                  <button
-                    class="danger"
-                    :disabled="state.deletingId === item.id"
-                    @click="handleDelete(item.id)"
-                  >
-                    {{ state.deletingId === item.id ? '删除中' : '删除' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <footer class="pager">
-        <button :disabled="state.current <= 1 || state.loading" @click="prevPage">上一页</button>
-        <span>第 {{ state.current }} 页</span>
-        <button :disabled="state.current >= Math.ceil(state.total / state.pageSize) || state.loading" @click="nextPage">下一页</button>
-      </footer>
-
-      <p v-if="state.platforms.length" class="platform-tip">
-        当前后端平台标签：{{ state.platforms.map((p) => p.label || p.value || p).join('、') }}
-      </p>
-    </section>
+          <div class="table-footer">
+            <el-pagination
+              background
+              layout="prev, pager, next, jumper"
+              :current-page="state.current"
+              :page-size="state.pageSize"
+              :total="state.total"
+              @current-change="handlePageChange"
+            />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
   </section>
 </template>
 
 <style scoped>
 .reply-page {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
-.panel {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-h3,
-h4 {
+.panel h3,
+.panel h4 {
   margin: 0;
-  color: #111827;
 }
 
 .hint {
-  margin: 8px 0 12px;
+  margin: 2px 0 0;
   color: #6b7280;
-  font-size: 14px;
-}
-
-.search-grid,
-.form-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-}
-
-.form-grid {
-  margin-top: 10px;
-}
-
-label {
-  display: grid;
-  gap: 6px;
-  color: #374151;
   font-size: 13px;
 }
 
-input,
-textarea {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 10px;
+.search-row {
+  margin-top: 8px;
 }
 
-.full-row {
-  margin-top: 10px;
-}
-
-.actions {
-  margin-top: 12px;
+.table-footer {
   display: flex;
-  gap: 8px;
-}
-
-button {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 7px 12px;
-  background: #fff;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.primary {
-  background: #7c3aed;
-  border-color: #7c3aed;
-  color: #fff;
-}
-
-.danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.msg {
-  margin: 8px 0 0;
-  font-size: 13px;
-}
-
-.msg.success {
-  color: #047857;
-}
-
-.msg.error {
-  color: #b91c1c;
-}
-
-.table-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  color: #374151;
-  font-size: 14px;
-}
-
-.table-wrap {
-  overflow: auto;
-}
-
-table {
-  width: 100%;
-  min-width: 900px;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  border: 1px solid #e5e7eb;
-  padding: 10px;
-  text-align: left;
-  vertical-align: top;
-}
-
-th {
-  background: #f9fafb;
-}
-
-.row-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.pager {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-}
-
-.empty,
-.platform-tip {
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.platform-tip {
-  margin: 10px 0 0;
-}
-
-@media (max-width: 900px) {
-  .search-grid,
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
+  margin-top: 10px;
 }
 </style>
