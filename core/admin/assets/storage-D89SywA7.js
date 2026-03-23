@@ -1,0 +1,1 @@
+import{t as e}from"./request-DaIsC5AZ.js";function t(t=``){return e({url:`/api/storage`,method:`get`,params:{search:t}})}function n(t){return e({url:`/api/storage/list`,method:`get`,params:t})}function r(t,n=``){return e({url:`/api/storage`,method:`put`,params:n?{uuid:n}:void 0,data:t})}export{t as n,r,n as t};
