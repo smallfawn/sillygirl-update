@@ -191,32 +191,6 @@ func initWeb() {
 				if !fs.IsDir() {
 					defer file.Close()
 					c.Header("cache-control", "max-age=864000")
-					// 根据文件扩展名设置正确的 Content-Type
-					path := c.Request.URL.Path
-					switch {
-					case strings.HasSuffix(path, ".js"):
-						c.Header("Content-Type", "application/javascript; charset=utf-8")
-					case strings.HasSuffix(path, ".css"):
-						c.Header("Content-Type", "text/css; charset=utf-8")
-					case strings.HasSuffix(path, ".html"):
-						c.Header("Content-Type", "text/html; charset=utf-8")
-					case strings.HasSuffix(path, ".json"):
-						c.Header("Content-Type", "application/json; charset=utf-8")
-					case strings.HasSuffix(path, ".svg"):
-						c.Header("Content-Type", "image/svg+xml")
-					case strings.HasSuffix(path, ".png"):
-						c.Header("Content-Type", "image/png")
-					case strings.HasSuffix(path, ".jpg"), strings.HasSuffix(path, ".jpeg"):
-						c.Header("Content-Type", "image/jpeg")
-					case strings.HasSuffix(path, ".ico"):
-						c.Header("Content-Type", "image/x-icon")
-					case strings.HasSuffix(path, ".woff"):
-						c.Header("Content-Type", "font/woff")
-					case strings.HasSuffix(path, ".woff2"):
-						c.Header("Content-Type", "font/woff2")
-					case strings.HasSuffix(path, ".ttf"):
-						c.Header("Content-Type", "font/ttf")
-					}
 					io.Copy(c.Writer, file)
 					return
 				} else {
