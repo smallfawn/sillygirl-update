@@ -7,7 +7,6 @@ import (
 	"embed"
 	"fmt"
 	"io"
-	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -191,33 +190,6 @@ func initWeb() {
 				fs, _ := file.Stat()
 				if !fs.IsDir() {
 					defer file.Close()
-					ext := strings.ToLower(filepath.Ext(fs.Name()))
-					ctype := mime.TypeByExtension(ext)
-					if ctype == "" {
-						switch ext {
-						case ".js", ".mjs":
-							ctype = "text/javascript; charset=utf-8"
-						case ".css":
-							ctype = "text/css; charset=utf-8"
-						case ".json":
-							ctype = "application/json; charset=utf-8"
-						case ".svg":
-							ctype = "image/svg+xml"
-						case ".woff", ".woff2":
-							ctype = "font/woff2"
-						case ".ttf":
-							ctype = "font/ttf"
-						case ".png":
-							ctype = "image/png"
-						case ".jpg", ".jpeg":
-							ctype = "image/jpeg"
-						case ".gif":
-							ctype = "image/gif"
-						}
-					}
-					if ctype != "" {
-						c.Header("Content-Type", ctype)
-					}
 					c.Header("cache-control", "max-age=864000")
 					io.Copy(c.Writer, file)
 					return
@@ -232,7 +204,6 @@ func initWeb() {
 				return
 			}
 		}
-
 		for _, req := range ss {
 			if c.Request.URL.Path == req.Path && (req.Method == c.Request.Method || req.Method == "ANY") {
 				req.Handle(c)

@@ -1,1 +1,0 @@
-- 默认前端技术偏好：Vue 3 + Vite + JavaScript + Pinia + Element Plus（Ant Design Pro 风格布局）
